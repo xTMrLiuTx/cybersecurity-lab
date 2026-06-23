@@ -142,7 +142,6 @@ SSL/TLS Certificate Information:
 ├── Certificate Chain: -----BEGIN CERTIFICATE-----
 │   MIIDBzCCAe+gAwIBAgIBAjANBgkqhkiG9w0BAQsFADA8MTowOAYDVQQDDDFNeVNR
 │   TF9UF9YXF1fNS43LjQQX0FldG9fR2VuZXJhdGVkX0NB...
-│   [Extended certificate data...]
 │   -----END CERTIFICATE-----
 └── Status: Secured with self-signed certificate
 ```
