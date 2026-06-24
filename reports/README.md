@@ -1,6 +1,6 @@
 # Reports — Overview
 
-This folder contains human-readable HTML reports and a short index describing where other report artifacts live in the repository.
+This folder contains HTML reports and a short index describing where other report artifacts live in the repository.
 
 Available reports (in this branch):
 
